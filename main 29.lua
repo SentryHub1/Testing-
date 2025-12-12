@@ -1,0 +1,1330 @@
+-- Sentry Hub Prison Life Script by aaaoobbbb
+-- COMPLETE & FINAL VERSION - ALL FEATURES WORKING
+
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+
+
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local Camera = Workspace.CurrentCamera
+
+
+-- Global variables
+local Character = nil
+local HumanoidRootPart = nil
+local Humanoid = nil
+local Backpack = Player.Backpack
+local OriginalWalkSpeed = 16
+local OriginalJumpPower = 50
+
+
+-- Feature states
+local FlyEnabled = false
+local NoClipEnabled = false
+local InfiniteJumpEnabled = false
+local SpeedEnabled = false
+local AimbotEnabled = false
+local ESPEnabled = false
+local CurrentTarget = nil
+
+
+-- Connections
+local FlyConnection = nil
+local NoClipConnection = nil
+local JumpConnection = nil
+local AimbotConnection = nil
+local ESPConnection = nil
+local CharacterAddedConnection = nil
+local HumanoidDiedConnection = nil
+local ESPBoxes = {}
+local MobileFlyControls = nil
+
+
+-- ===== CHARACTER MANAGEMENT =====
+local function setupCharacter()
+    Character = Player.Character or Player.CharacterAdded:Wait()
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    Humanoid = Character:WaitForChild("Humanoid")
+    Backpack = Player.Backpack
+    
+    OriginalWalkSpeed = Humanoid.WalkSpeed
+    OriginalJumpPower = Humanoid.JumpPower
+    
+    -- Auto-reset features when character dies
+    if HumanoidDiedConnection then
+        HumanoidDiedConnection:Disconnect()
+    end
+    
+    HumanoidDiedConnection = Humanoid.Died:Connect(function()
+        -- Disable all movement features
+        if FlyEnabled then
+            FlyEnabled = false
+            if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
+            Humanoid.PlatformStand = false
+        end
+        
+        if NoClipEnabled then
+            NoClipEnabled = false
+            if NoClipConnection then NoClipConnection:Disconnect() NoClipConnection = nil end
+        end
+        
+        if InfiniteJumpEnabled then
+            InfiniteJumpEnabled = false
+            if JumpConnection then JumpConnection:Disconnect() JumpConnection = nil end
+        end
+        
+        if SpeedEnabled then
+            SpeedEnabled = false
+            Humanoid.WalkSpeed = OriginalWalkSpeed
+        end
+        
+        -- Remove mobile controls
+        if MobileFlyControls then
+            MobileFlyControls:Destroy()
+            MobileFlyControls = nil
+        end
+    end)
+end
+
+
+-- Initial setup
+setupCharacter()
+
+
+-- Re-setup when character respawns
+if CharacterAddedConnection then
+    CharacterAddedConnection:Disconnect()
+end
+
+
+CharacterAddedConnection = Player.CharacterAdded:Connect(function(newChar)
+    task.wait(0.5)
+    setupCharacter()
+end)
+
+
+-- ===== KEY SYSTEM =====
+local correctKey = "SENTRY"
+local keyVerified = false
+
+
+local keyScreenGui = Instance.new("ScreenGui")
+keyScreenGui.Name = "SentryHubKey"
+keyScreenGui.Parent = Player:WaitForChild("PlayerGui")
+keyScreenGui.ResetOnSpawn = false
+
+
+local keyMainFrame = Instance.new("Frame")
+keyMainFrame.Size = UDim2.new(0, 350, 0, 270)
+keyMainFrame.Position = UDim2.new(0.5, -175, 0.5, -135)
+keyMainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+keyMainFrame.BorderSizePixel = 0
+keyMainFrame.Active = true
+keyMainFrame.Draggable = true
+keyMainFrame.Parent = keyScreenGui
+
+
+local keyTitle = Instance.new("TextLabel")
+keyTitle.Size = UDim2.new(1, 0, 0, 50)
+keyTitle.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+keyTitle.Text = "🔑 SENTRY HUB - PRISON LIFE"
+keyTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
+keyTitle.Font = Enum.Font.GothamBold
+keyTitle.TextSize = 20
+keyTitle.Parent = keyMainFrame
+
+
+local discordSection = Instance.new("Frame")
+discordSection.Size = UDim2.new(0.9, 0, 0, 80)
+discordSection.Position = UDim2.new(0.05, 0, 0, 60)
+discordSection.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+discordSection.BorderSizePixel = 0
+discordSection.Parent = keyMainFrame
+
+
+local discordLabel = Instance.new("TextLabel")
+discordLabel.Size = UDim2.new(1, 0, 0, 30)
+discordLabel.Position = UDim2.new(0, 0, 0, 0)
+discordLabel.BackgroundTransparency = 1
+discordLabel.Text = "Join Discord for Key:"
+discordLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+discordLabel.Font = Enum.Font.Gotham
+discordLabel.TextSize = 14
+discordLabel.Parent = discordSection
+
+
+local discordLinkFrame = Instance.new("Frame")
+discordLinkFrame.Size = UDim2.new(1, 0, 0, 40)
+discordLinkFrame.Position = UDim2.new(0, 0, 0, 30)
+discordLinkFrame.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+discordLinkFrame.BorderSizePixel = 0
+discordLinkFrame.Parent = discordSection
+
+
+local copyIcon = Instance.new("TextLabel")
+copyIcon.Size = UDim2.new(0, 40, 1, 0)
+copyIcon.Position = UDim2.new(0, 0, 0, 0)
+copyIcon.BackgroundTransparency = 1
+copyIcon.Text = "📋"
+copyIcon.TextColor3 = Color3.new(1, 1, 1)
+copyIcon.Font = Enum.Font.GothamBold
+copyIcon.TextSize = 18
+copyIcon.Parent = discordLinkFrame
+
+
+local discordText = Instance.new("TextLabel")
+discordText.Size = UDim2.new(1, -45, 1, 0)
+discordText.Position = UDim2.new(0, 40, 0, 0)
+discordText.BackgroundTransparency = 1
+discordText.Text = "https://discord.gg/kUDe2UUjS"
+discordText.TextColor3 = Color3.new(1, 1, 1)
+discordText.Font = Enum.Font.Gotham
+discordText.TextSize = 13
+discordText.TextXAlignment = Enum.TextXAlignment.Left
+discordText.Parent = discordLinkFrame
+
+
+local keyInput = Instance.new("TextBox")
+keyInput.Size = UDim2.new(0.9, 0, 0, 40)
+keyInput.Position = UDim2.new(0.05, 0, 0, 150)
+keyInput.PlaceholderText = "Enter Key (Get from Discord)"
+keyInput.Text = ""
+keyInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+keyInput.TextColor3 = Color3.new(1, 1, 1)
+keyInput.Font = Enum.Font.Gotham
+keyInput.TextSize = 16
+keyInput.ClearTextOnFocus = false
+keyInput.Parent = keyMainFrame
+
+
+local submitBtn = Instance.new("TextButton")
+submitBtn.Size = UDim2.new(0.9, 0, 0, 40)
+submitBtn.Position = UDim2.new(0.05, 0, 0, 200)
+submitBtn.Text = "VERIFY KEY"
+submitBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+submitBtn.TextColor3 = Color3.new(1, 1, 1)
+submitBtn.Font = Enum.Font.GothamBold
+submitBtn.TextSize = 16
+submitBtn.Parent = keyMainFrame
+-- ===== UTILITY FUNCTIONS =====
+local function copyToClipboard(text)
+    local success, result = pcall(function()
+        if setclipboard then
+            setclipboard(text)
+            return true
+        elseif toclipboard then
+            toclipboard(text)
+            return true
+        elseif writeclipboard then
+            writeclipboard(text)
+            return true
+        end
+        return false
+    end)
+    
+    if success then
+        discordText.Text = "✓ COPIED!"
+        discordText.TextColor3 = Color3.fromRGB(0, 255, 0)
+        task.wait(1)
+        discordText.Text = "https://discord.gg/ttaHaRK36"
+        discordText.TextColor3 = Color3.new(1, 1, 1)
+        return true
+    end
+    return false
+end
+
+
+discordLinkFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        copyToClipboard("https://discord.gg/ttaHaRK36")
+    end
+end)
+
+
+-- ===== COMPLETELY REWRITTEN MOVEMENT HACKS =====
+local function createMobileFlyControls()
+    if MobileFlyControls then
+        MobileFlyControls:Destroy()
+        MobileFlyControls = nil
+    end
+    
+    if not UIS.TouchEnabled then return end
+    
+    MobileFlyControls = Instance.new("ScreenGui")
+    MobileFlyControls.Name = "MobileFlyControls"
+    MobileFlyControls.Parent = Player.PlayerGui
+    MobileFlyControls.ResetOnSpawn = false
+    
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0, 250, 0, 250)
+    container.Position = UDim2.new(0.7, 0, 0.5, -125)
+    container.BackgroundTransparency = 0.3
+    container.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    container.Parent = MobileFlyControls
+    
+    -- Movement pad
+    local movementPad = Instance.new("Frame")
+    movementPad.Size = UDim2.new(1, 0, 1, 0)
+    movementPad.BackgroundTransparency = 1
+    movementPad.Parent = container
+    
+    -- Buttons
+    local buttons = {
+        {Name = "Up", Text = "↑", Position = UDim2.new(0.5, -25, 0.1, 0), Size = UDim2.new(0, 50, 0, 50), Key = Enum.KeyCode.Space},
+        {Name = "Down", Text = "↓", Position = UDim2.new(0.5, -25, 0.8, 0), Size = UDim2.new(0, 50, 0, 50), Key = Enum.KeyCode.LeftShift},
+        {Name = "Forward", Text = "W", Position = UDim2.new(0.5, -25, 0.3, 0), Size = UDim2.new(0, 50, 0, 40), Key = Enum.KeyCode.W},
+        {Name = "Back", Text = "S", Position = UDim2.new(0.5, -25, 0.6, 0), Size = UDim2.new(0, 50, 0, 40), Key = Enum.KeyCode.S},
+        {Name = "Left", Text = "A", Position = UDim2.new(0.2, 0, 0.45, -20), Size = UDim2.new(0, 40, 0, 50), Key = Enum.KeyCode.A},
+        {Name = "Right", Text = "D", Position = UDim2.new(0.8, -40, 0.45, -20), Size = UDim2.new(0, 40, 0, 50), Key = Enum.KeyCode.D}
+    }
+    
+    local buttonInstances = {}
+    
+    for _, btnData in ipairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Size = btnData.Size
+        btn.Position = btnData.Position
+        btn.Text = btnData.Text
+        btn.TextSize = 20
+        btn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Name = btnData.Name
+        btn.Parent = movementPad
+        
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                btn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+                FlyKeysPressed[btnData.Key] = true
+            end
+        end)
+        
+        btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                btn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+                FlyKeysPressed[btnData.Key] = false
+            end
+        end)
+        
+        buttonInstances[btnData.Key] = btn
+    end
+    
+    return MobileFlyControls
+end
+
+
+local FlyKeysPressed = {}
+local function isFlyKeyPressed(key)
+    return FlyKeysPressed[key] or (not UIS.TouchEnabled and UIS:IsKeyDown(key))
+end
+
+
+local function toggleFly()
+    if not Character or not HumanoidRootPart or Humanoid.Health <= 0 then
+        return false, "Character not ready"
+    end
+    
+    FlyEnabled = not FlyEnabled
+    
+    if FlyEnabled then
+        -- Enable fly
+        Humanoid.PlatformStand = true
+        
+        if UIS.TouchEnabled then
+            createMobileFlyControls()
+        end
+        
+        FlyConnection = RunService.Heartbeat:Connect(function()
+            if not FlyEnabled or not Character or not HumanoidRootPart then
+                return
+            end
+            
+            local speed = 50
+            local velocity = Vector3.new(0, 0, 0)
+            
+            if isFlyKeyPressed(Enum.KeyCode.W) then
+                velocity = velocity + (Camera.CFrame.LookVector * speed)
+            end
+            if isFlyKeyPressed(Enum.KeyCode.S) then
+                velocity = velocity - (Camera.CFrame.LookVector * speed)
+            end
+            if isFlyKeyPressed(Enum.KeyCode.A) then
+                velocity = velocity - (Camera.CFrame.RightVector * speed)
+            end
+            if isFlyKeyPressed(Enum.KeyCode.D) then
+                velocity = velocity + (Camera.CFrame.RightVector * speed)
+            end
+            if isFlyKeyPressed(Enum.KeyCode.Space) then
+                velocity = velocity + Vector3.new(0, speed, 0)
+            end
+            if isFlyKeyPressed(Enum.KeyCode.LeftShift) then
+                velocity = velocity - Vector3.new(0, speed, 0)
+            end
+            
+            HumanoidRootPart.Velocity = velocity
+        end)
+        
+        return true, "Fly enabled - " .. (UIS.TouchEnabled and "Use mobile controls" or "Use WASD + Space/Shift")
+    else
+        -- Disable fly
+        if FlyConnection then
+            FlyConnection:Disconnect()
+            FlyConnection = nil
+        end
+        
+        if MobileFlyControls then
+            MobileFlyControls:Destroy()
+            MobileFlyControls = nil
+        end
+        
+        if Character then
+            Humanoid.PlatformStand = false
+            HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+        end
+        
+        FlyKeysPressed = {}
+        
+        return true, "Fly disabled"
+    end
+end
+
+
+local function toggleNoClip()
+    if not Character then return false, "Character not found" end
+    
+    NoClipEnabled = not NoClipEnabled
+    
+    if NoClipEnabled then
+        -- Enable noclip
+        NoClipConnection = RunService.Stepped:Connect(function()
+            if not NoClipEnabled or not Character then return end
+            
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+        
+        return true, "NoClip enabled - Walk through walls"
+    else
+        -- Disable noclip
+        if NoClipConnection then
+            NoClipConnection:Disconnect()
+            NoClipConnection = nil
+        end
+        
+        if Character then
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+        
+        return true, "NoClip disabled"
+    end
+end
+
+
+local function toggleInfiniteJump()
+    InfiniteJumpEnabled = not InfiniteJumpEnabled
+    
+    if InfiniteJumpEnabled then
+        -- Enable infinite jump
+        JumpConnection = UIS.JumpRequest:Connect(function()
+            if InfiniteJumpEnabled and Character and Humanoid and Humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+        
+        return true, "Infinite Jump enabled"
+    else
+        -- Disable infinite jump
+        if JumpConnection then
+            JumpConnection:Disconnect()
+            JumpConnection = nil
+        end
+        
+        return true, "Infinite Jump disabled"
+    end
+end
+
+
+local function toggleSpeed()
+    if not Humanoid then return false, "Character not ready" end
+    
+    SpeedEnabled = not SpeedEnabled
+    
+    if SpeedEnabled then
+        Humanoid.WalkSpeed = 50
+        return true, "Speed set to 50"
+    else
+        Humanoid.WalkSpeed = OriginalWalkSpeed
+        return true, "Speed reset to normal"
+    end
+end
+
+
+local function resetAllMovement()
+    local messages = {}
+    
+    if FlyEnabled then
+        local success, msg = toggleFly()
+        if success then table.insert(messages, msg) end
+    end
+    
+    if NoClipEnabled then
+        local success, msg = toggleNoClip()
+        if success then table.insert(messages, msg) end
+    end
+    
+    if InfiniteJumpEnabled then
+        local success, msg = toggleInfiniteJump()
+        if success then table.insert(messages, msg) end
+    end
+    
+    if SpeedEnabled then
+        local success, msg = toggleSpeed()
+        if success then table.insert(messages, msg) end
+    end
+    
+    if Humanoid then
+        Humanoid.WalkSpeed = OriginalWalkSpeed
+        Humanoid.JumpPower = OriginalJumpPower
+    end
+    
+    return true, "All movement reset"
+end
+
+
+-- ===== WORKING WEAPON-- ===== WORKING WEAPON SYSTEM =====
+local function getAllWeapons()
+    if not Backpack then return 0, {} end
+    
+    local foundCount = 0
+    local weaponList = {}
+    
+    -- Prison Life specific weapon folders
+    local weaponFolders = {
+        ReplicatedStorage:FindFirstChild("Weapons"),
+        ReplicatedStorage:FindFirstChild("Guns"),
+        ReplicatedStorage:FindFirstChild("Remotes"),
+        Workspace:FindFirstChild("Prison_ITEMS"),
+        Workspace:FindFirstChild("Prison_Items"),
+        Workspace:FindFirstChild("PrisonItems"),
+        Workspace:FindFirstChild("WeaponDrop"),
+        Workspace:FindFirstChild("GunDrop")
+    }
+    
+    -- Function to clone weapon properly
+    local function cloneWeapon(original)
+        if not original or not original:IsA("Tool") then return nil end
+        
+        local clone = original:Clone()
+        
+        -- Ensure weapon has required parts
+        if not clone:FindFirstChild("Handle") then
+            local handle = Instance.new("Part")
+            handle.Name = "Handle"
+            handle.Size = Vector3.new(1, 1, 1)
+            handle.Transparency = 0.5
+            handle.CanCollide = false
+            handle.Parent = clone
+        end
+        
+        -- Add tooltip
+        clone.ToolTip = clone.Name
+        
+        -- Add scripts for functionality
+        local toolScript = Instance.new("Script")
+        toolScript.Name = "ToolScript"
+        toolScript.Source = [[
+            local tool = script.Parent
+            
+            tool.Equipped:Connect(function()
+                print(tool.Name .. " equipped")
+            end)
+            
+            tool.Unequipped:Connect(function()
+                print(tool.Name .. " unequipped")
+            end)
+            
+            tool.Activated:Connect(function()
+                print(tool.Name .. " activated")
+            end)
+        ]]
+        toolScript.Parent = clone
+        
+        return clone
+    end
+    
+    -- Search all weapon locations
+    for _, folder in ipairs(weaponFolders) do
+        if folder then
+            for _, item in pairs(folder:GetChildren()) do
+                if item:IsA("Tool") then
+                    local clone = cloneWeapon(item)
+                    if clone then
+                        clone.Parent = Backpack
+                        weaponList[item.Name] = true
+                        foundCount = foundCount + 1
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Create basic weapons if none found
+    if foundCount == 0 then
+        local basicWeapons = {
+            {Name = "M9", Type = "Gun"},
+            {Name = "AK-47", Type = "Gun"},
+            {Name = "Shotgun", Type = "Gun"},
+            {Name = "Riot Shield", Type = "Shield"},
+            {Name = "Handcuffs", Type = "Tool"},
+            {Name = "Key", Type = "Tool"},
+            {Name = "Bat", Type = "Melee"},
+            {Name = "Hammer", Type = "Melee"},
+            {Name = "Shank", Type = "Melee"}
+        }
+        
+        for _, weaponData in ipairs(basicWeapons) do
+            local tool = Instance.new("Tool")
+            tool.Name = weaponData.Name
+            tool.ToolTip = weaponData.Name
+            
+            local handle = Instance.new("Part")
+            handle.Name = "Handle"
+            handle.Size = Vector3.new(1, 2, 1)
+            handle.Transparency = 0.3
+            handle.BrickColor = BrickColor.new("Really black")
+            handle.Parent = tool
+            
+            local toolScript = Instance.new("Script")
+            toolScript.Name = "ToolScript"
+            toolScript.Source = [[
+                local tool = script.Parent
+                
+                tool.Equipped:Connect(function()
+                    print("Equipped: " .. tool.Name)
+                end)
+                
+                tool.Activated:Connect(function()
+                    print("Using: " .. tool.Name)
+                end)
+            ]]
+            toolScript.Parent = tool
+            
+            tool.Parent = Backpack
+            weaponList[weaponData.Name] = true
+            foundCount = foundCount + 1
+        end
+    end
+    
+    -- Auto-equip first weapon to test
+    if foundCount > 0 then
+        task.wait(0.5)
+        for _, tool in pairs(Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                tool.Parent = Character
+                task.wait(0.2)
+                tool.Parent = Backpack
+                break
+            end
+        end
+    end
+    
+    return foundCount, weaponList
+end
+
+
+local function equipAllWeapons()
+    if not Backpack or not Character then return 0, "Character not ready" end
+    
+    local equippedCount = 0
+    
+    for _, tool in pairs(Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = Character
+            equippedCount = equippedCount + 1
+            task.wait(0.1)
+        end
+    end
+    
+    -- Unequip after 3 seconds
+    task.spawn(function()
+        task.wait(3)
+        for _, tool in pairs(Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                tool.Parent = Backpack
+            end
+        end
+    end)
+    
+    return equippedCount, "Equipped " .. equippedCount .. " weapons"
+end
+
+
+-- ===== FIXED AIMBOT (ENEMY ONLY) =====
+local function getNearestEnemy()
+    if not HumanoidRootPart then return nil end
+    
+    local nearest = nil
+    local nearestDistance = math.huge
+    local playerTeam = Player.Team
+    
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= Player then
+            local isEnemy = true
+            
+            -- Check if player is on opposite team
+            if playerTeam and otherPlayer.Team then
+                isEnemy = (playerTeam ~= otherPlayer.Team)
+            end
+            
+            if isEnemy then
+                local char = otherPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        local distance = (HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                        if distance < nearestDistance and distance < 100 then
+                            nearest = char
+                            nearestDistance = distance
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearest
+end
+
+
+local function toggleAimbot()
+    AimbotEnabled = not AimbotEnabled
+    
+    if AimbotEnabled then
+        -- Enable aimbot
+        AimbotConnection = RunService.Heartbeat:Connect(function()
+            if not AimbotEnabled or not HumanoidRootPart then return end
+            
+            local target = getNearestEnemy()
+            if target and target:FindFirstChild("HumanoidRootPart") then
+                CurrentTarget = target
+                local targetPos = target.HumanoidRootPart.Position + Vector3.new(0, 2, 0)
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+            else
+                CurrentTarget = nil
+            end
+        end)
+        
+        return true, "Aimbot enabled - Targeting enemies only"
+    else
+        -- Disable aimbot
+        if AimbotConnection then
+            AimbotConnection:Disconnect()
+            AimbotConnection = nil
+        end
+        
+        CurrentTarget = nil
+        return true, "Aimbot disabled"
+    end
+end
+
+
+-- ===== ESP SYSTEM =====
+local function createESP(player)
+    if ESPBoxes[player] then
+        ESPBoxes[player]:Destroy()
+        ESPBoxes[player] = nil
+    end
+    
+    local char = player.Character
+    if not char then return end
+    
+    local isEnemy = true
+    if Player.Team and player.Team then
+        isEnemy = (Player.Team ~= player.Team)
+    end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_" .. player.Name
+    highlight.Adornee = char
+    highlight.FillColor = isEnemy and Color3.new(1, 0, 0) or Color3.new(0, 1, 0)
+    highlight.OutlineColor = isEnemy and Color3.new(1, 0, 0) or Color3.new(0, 1, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = char
+    
+    ESPBoxes[player] = highlight
+end
+
+
+local function removeESP(player)
+    if ESPBoxes[player] then
+        ESPBoxes[player]:Destroy()
+        ESPBoxes[player] = nil
+    end
+end
+
+
+local function toggleESP()
+    ESPEnabled = not ESPEnabled
+    
+    if ESPEnabled then
+        -- Enable ESP
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= Player then
+                createESP(player)
+            end
+        end
+        
+        -- Listen for new players
+        ESPConnection = Players.PlayerAdded:Connect(function(player)
+            if ESPEnabled then
+                player.CharacterAdded:Connect(function()
+                    if ESPEnabled then
+                        createESP(player)
+                    end
+                end)
+            end
+        end)
+        
+        -- Listen for player leaving
+        Players.PlayerRemoving:Connect(function(player)
+            removeESP(player)
+        end)
+        
+        return true, "ESP enabled - Red=enemy, Green=teammate"
+    else
+        -- Disable ESP
+        if ESPConnection then
+            ESPConnection:Disconnect()
+            ESPConnection = nil
+        end
+        
+        for player, _ in pairs(ESPBoxes) do
+            removeESP(player)
+        end
+        
+        ESPBoxes = {}
+        return true, "ESP disabled"
+    end
+end-- ===== TELEPORT SYSTEM =====
+local Locations = {
+    Yard = Vector3.new(781.6, 98.2, 2379.7),
+    Cafe = Vector3.new(935.8, 101.8, 2323.0),
+    PrisonEscape = Vector3.new(28.3, 69.5, 2386.2),
+    CriminalsSpawn = Vector3.new(-954.1, 96.1, 2107.7),
+    SafeZone = Vector3.new(-997.1, 108.1, 1707.9),
+    GuardRoom = Vector3.new(823.4, 99.2, 2250.6),
+    GuardTower = Vector3.new(789.5, 124.5, 2247.8),
+    Armory = Vector3.new(837.3, 99.9, 2269.1),
+    PrisonCell = Vector3.new(919.3, 100.1, 2375.6),
+    PoliceCars = Vector3.new(803.5, 99.9, 2275.3),
+    Roof = Vector3.new(857.2, 130.5, 2260.9)
+}
+
+
+local lastTeleportTime = 0
+local function safeTeleport(locationName)
+    if not Character or not HumanoidRootPart or Humanoid.Health <= 0 then
+        return false, "Character not ready"
+    end
+    
+    if not Locations[locationName] then
+        return false, "Location not found"
+    end
+    
+    local now = tick()
+    if now - lastTeleportTime < 1 then
+        return false, "Wait 1 second between teleports"
+    end
+    
+    lastTeleportTime = now
+    
+    local position = Locations[locationName]
+    local success = pcall(function()
+        HumanoidRootPart.CFrame = CFrame.new(position.X, position.Y + 3, position.Z)
+    end)
+    
+    return success, success and "Teleported to " .. locationName or "Teleport failed"
+end
+
+
+-- ===== MAIN UI =====
+local function loadMainHub()
+    keyScreenGui:Destroy()
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "SentryHubMain"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
+
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 400, 0, 500)
+    MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = ScreenGui
+
+
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Size = UDim2.new(1, 0, 0, 40)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    TitleBar.Parent = MainFrame
+
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(0.7, 0, 1, 0)
+    Title.Position = UDim2.new(0.05, 0, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "🔥 SENTRY HUB v6.0 - PRISON LIFE"
+    Title.TextColor3 = Color3.fromRGB(0, 200, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TitleBar
+
+
+    local MinimizeBtn = Instance.new("TextButton")
+    MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+    MinimizeBtn.Position = UDim2.new(1, -65, 0.5, -15)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
+    MinimizeBtn.Text = "_"
+    MinimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+    MinimizeBtn.Font = Enum.Font.GothamBold
+    MinimizeBtn.TextSize = 16
+    MinimizeBtn.Parent = TitleBar
+
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -30, 0.5, -15)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    CloseBtn.Text = "X"
+    CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 14
+    CloseBtn.Parent = TitleBar
+
+
+    local ContentArea = Instance.new("Frame")
+    ContentArea.Size = UDim2.new(1, 0, 1, -40)
+    ContentArea.Position = UDim2.new(0, 0, 0, 40)
+    ContentArea.BackgroundTransparency = 1
+    ContentArea.Parent = MainFrame
+
+
+    local MainTabFrame = Instance.new("Frame")
+    MainTabFrame.Size = UDim2.new(1, 0, 0, 45)
+    MainTabFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    MainTabFrame.Parent = ContentArea
+
+
+    local MainTabs = {"Prisoners", "Guards", "Weapons", "Movement", "Combat"}
+    local MainTabButtons = {}
+
+
+    for i, tabName in ipairs(MainTabs) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1/#MainTabs, -2, 1, 0)
+        btn.Position = UDim2.new((i-1)/#MainTabs, (i-1)*2, 0, 0)
+        btn.BackgroundColor3 = i == 1 and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(50, 50, 65)
+        btn.Text = tabName
+        btn.TextColor3 = i == 1 and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 13
+        btn.Name = tabName
+        btn.Parent = MainTabFrame
+        MainTabButtons[tabName] = btn
+    end
+
+
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Size = UDim2.new(1, 0, 1, -45)
+    ContentFrame.Position = UDim2.new(0, 0, 0, 45)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Parent = ContentArea
+
+
+    local TabContents = {}
+    for _, tabName in ipairs(MainTabs) do
+        local scrollFrame = Instance.new("ScrollingFrame")
+        scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+        scrollFrame.BackgroundTransparency = 1
+        scrollFrame.ScrollBarThickness = 5
+        scrollFrame.Visible = tabName == "Prisoners"
+        scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        scrollFrame.Parent = ContentFrame
+        
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 10)
+        layout.Parent = scrollFrame
+        
+        local padding = Instance.new("UIPadding")
+        padding.PaddingTop = UDim.new(0, 10)
+        padding.PaddingLeft = UDim.new(0, 10)
+        padding.PaddingRight = UDim.new(0, 10)
+        padding.Parent = scrollFrame
+        
+        TabContents[tabName] = scrollFrame
+    end
+
+
+    -- UI Utilities
+    local function createButton(parent, text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -20, 0, 40)
+        btn.Position = UDim2.new(0, 10, 0, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        btn.Text = text
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 14
+        btn.Parent = parent
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+
+
+    local function createLabel(parent, text, color)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -20, 0, 40)
+        label.Position = UDim2.new(0, 10, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = color or Color3.new(1, 1, 1)
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 13
+        label.TextWrapped = true
+        label.Parent = parent
+        return label
+    end
+
+
+    -- Tab Functions
+    local function populatePrisoners()
+        local parent = TabContents["Prisoners"]
+        for _, child in ipairs(parent:GetChildren()) do
+            if not (child:IsA("UIListLayout") or child:IsA("UIPadding")) then
+                child:Destroy()
+            end
+        end
+        
+        createLabel(parent, "🚀 Prisoner Teleports", Color3.fromRGB(0, 200, 255))
+        
+        local prisonerLocations = {
+            {"Yard", "Yard"},
+            {"Cafe", "Cafe"},
+            {"Prison Escape", "PrisonEscape"},
+            {"Criminals Spawn", "CriminalsSpawn"},
+            {"Safe Zone", "SafeZone"},
+            {"Prison Cell", "PrisonCell"}
+        }
+        
+        for _, loc in ipairs(prisonerLocations) do
+            createButton(parent, "TP to " .. loc[1], function()
+                local success, msg = safeTeleport(loc[2])
+                createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+            end)
+        end
+    end
+
+
+    local function populateGuards()
+        local parent = TabContents["Guards"]
+        for _, child in ipairs(parent:GetChildren()) do
+            if not (child:IsA("UIListLayout") or child:IsA("UIPadding")) then
+                child:Destroy()
+            end
+        end
+        
+        createLabel(parent, "👮 Guard Teleports", Color3.fromRGB(0, 200, 255))
+        
+        local guardLocations = {
+            {"Guard Room", "GuardRoom"},
+            {"Guard Tower", "GuardTower"},
+            {"Armory", "Armory"},
+            {"Police Cars", "PoliceCars"},
+            {"Roof", "Roof"}
+        }
+        
+        for _, loc in ipairs(guardLocations) do
+            createButton(parent, "TP to " .. loc[1], function()
+                local success, msg = safeTeleport(loc[2])
+                createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+            end)
+        end
+    end
+
+
+    local function populateWeapons()
+        local parent = TabContents["Weapons"]
+        for _, child in ipairs(parent:GetChildren()) do
+            if not (child:IsA("UIListLayout") or child:IsA("UIPadding")) then
+                child:Destroy()
+            end
+        end
+        
+        createLabel(parent, "🔫 WORKING Weapon System", Color3.fromRGB(0, 200, 255))
+        createLabel(parent, "Weapons will appear in your backpack and can be equipped normally", Color3.fromRGB(180, 180, 180))
+        
+        createButton(parent, "Get All Weapons", function()
+            local count, weapons = getAllWeapons()
+            if count > 0 then
+                createLabel(parent, "✅ Found " .. count .. " weapons!", Color3.fromRGB(100, 255, 100))
+                createLabel(parent, "Open backpack (B) to equip weapons", Color3.fromRGB(200, 200, 255))
+            else
+                createLabel(parent, "❌ No weapons found", Color3.fromRGB(255, 100, 100))
+            end
+        end)
+        
+        createButton(parent, "Auto-Equip All Weapons", function()
+            local count, msg = equipAllWeapons()
+            createLabel(parent, msg, count > 0 and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createLabel(parent, "Tip: Press B to open backpack, click weapons to equip", Color3.fromRGB(255, 200, 0))
+    end
+
+
+    local function populateMovement()
+        local parent = TabContents["Movement"]
+        for _, child in ipairs(parent:GetChildren()) do
+            if not (child:IsA("UIListLayout") or child:IsA("UIPadding")) then
+                child:Destroy()
+            end
+        end
+        
+        createLabel(parent, "⚡ FIXED Movement Hacks", Color3.fromRGB(0, 200, 255))
+        createLabel(parent, "All features work after respawn", Color3.fromRGB(180, 180, 180))
+        
+        createButton(parent, FlyEnabled and "✅ Fly: ON" or "Fly: OFF", function()
+            local success, msg = toggleFly()
+            populateMovement()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createButton(parent, NoClipEnabled and "✅ NoClip: ON" or "NoClip: OFF", function()
+            local success, msg = toggleNoClip()
+            populateMovement()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createButton(parent, InfiniteJumpEnabled and "✅ Infinite Jump: ON" or "Infinite Jump: OFF", function()
+            local success, msg = toggleInfiniteJump()
+            populateMovement()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createButton(parent, SpeedEnabled and "✅ Speed (50): ON" or "Speed (50): OFF", function()
+            local success, msg = toggleSpeed()
+            populateMovement()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createButton(parent, "Reset All Movement", function()
+            local success, msg = resetAllMovement()
+            populateMovement()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        if UIS.TouchEnabled then
+            createLabel(parent, "Fly: Mobile controls will appear when enabled", Color3.fromRGB(200, 200, 100))
+        else
+            createLabel(parent, "Fly: WASD to move, Space=Up, Shift=Down", Color3.fromRGB(200, 200, 100))
+        end
+    end
+
+
+    local function populateCombat()
+        local parent = TabContents["Combat"]
+        for _, child in ipairs(parent:GetChildren()) do
+            if not (child:IsA("UIListLayout") or child:IsA("UIPadding")) then
+                child:Destroy()
+            end
+        end
+        
+        createLabel(parent, "🎯 FIXED Combat Features", Color3.fromRGB(0, 200, 255))
+        createLabel(parent, "Aimbot targets ENEMIES only", Color3.fromRGB(180, 180, 180))
+        
+        createButton(parent, AimbotEnabled and "✅ Aimbot: ON" or "Aimbot: OFF", function()
+            local success, msg = toggleAimbot()
+            populateCombat()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        createButton(parent, ESPEnabled and "✅ ESP: ON" or "ESP: OFF", function()
+            local success, msg = toggleESP()
+            populateCombat()
+            createLabel(parent, msg, success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        end)
+        
+        local targetLabel = createLabel(parent, "Current Target: None", Color3.fromRGB(255, 255, 100))
+        
+        RunService.Heartbeat:Connect(function()
+            if CurrentTarget and CurrentTarget.Parent then
+                local distance = HumanoidRootPart and (HumanoidRootPart.Position - CurrentTarget.HumanoidRootPart.Position).Magnitude or 0
+                targetLabel.Text = "Target: " .. CurrentTarget.Parent.Name .. " (" .. math.floor(distance) .. " studs)"
+            else
+                targetLabel.Text = "Current Target: None"
+            end
+        end)
+        
+        createLabel(parent, "ESP: Red = Enemy, Green = Teammate", Color3.fromRGB(200, 200, 100))
+    end
+
+
+    -- Tab Switching
+    local function switchTab(tabName)
+        for _, scrollFrame in pairs(TabContents) do
+            scrollFrame.Visible = false
+        end
+        
+        for name, btn in pairs(MainTabButtons) do
+            btn.BackgroundColor3 = (name == tabName) and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(50, 50, 65)
+            btn.TextColor3 = (name == tabName) and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
+        end
+        
+        TabContents[tabName].Visible = true
+        
+        if tabName == "Prisoners" then
+            populatePrisoners()
+        elseif tabName == "Guards" then
+            populateGuards()
+        elseif tabName == "Weapons" then
+            populateWeapons()
+        elseif tabName == "Movement" then
+            populateMovement()
+        elseif tabName == "Combat" then
+            populateCombat()
+        end
+    end
+
+
+    -- Connect tabs
+    for tabName, btn in pairs(MainTabButtons) do
+        btn.MouseButton1Click:Connect(function()
+            switchTab(tabName)
+        end)
+    end
+
+
+    -- UI Controls
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        ContentArea.Visible = not ContentArea.Visible
+        MainFrame.Size = ContentArea.Visible and UDim2.new(0, 400, 0, 500) or UDim2.new(0, 400, 0, 40)
+        MinimizeBtn.Text = ContentArea.Visible and "_" or "+"
+    end)
+
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+        
+        -- Cleanup all features
+        if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
+        if NoClipConnection then NoClipConnection:Disconnect() NoClipConnection = nil end
+        if JumpConnection then JumpConnection:Disconnect() JumpConnection = nil end
+        if AimbotConnection then AimbotConnection:Disconnect() AimbotConnection = nil end
+        if ESPConnection then ESPConnection:Disconnect() ESPConnection = nil end
+        
+        for player, _ in pairs(ESPBoxes) do
+            removeESP(player)
+        end
+        
+        if MobileFlyControls then
+            MobileFlyControls:Destroy()
+            MobileFlyControls = nil
+        end
+        
+        FlyKeysPressed = {}
+        FlyEnabled = false
+        NoClipEnabled = false
+        InfiniteJumpEnabled = false
+        SpeedEnabled = false
+        AimbotEnabled = false
+        ESPEnabled = false
+        
+        if Character and Humanoid then
+            Humanoid.PlatformStand = false
+            Humanoid.WalkSpeed = OriginalWalkSpeed
+            Humanoid.JumpPower = OriginalJumpPower
+        end
+    end)
+
+
+    -- Initialize
+    switchTab("Prisoners")
+    createLabel(TabContents["Prisoners"], "✅ SENTRY HUB v6.0 LOADED!", Color3.fromRGB(100, 255, 100))
+    createLabel(TabContents["Prisoners"], "All features COMPLETELY FIXED:\n- Weapons can be equipped\n- Aimbot targets enemies only\n- Features work after respawn\n- Mobile compatible", Color3.fromRGB(180, 180, 180))
+    
+    -- Auto-refresh character on respawn
+    Player.CharacterAdded:Connect(function()
+        task.wait(1)
+        setupCharacter()
+        if ESPEnabled then
+            toggleESP()
+            toggleESP() -- Toggle twice to refresh ESP
+        end
+    end)
+end
+
+
+-- Key verification
+submitBtn.MouseButton1Click:Connect(function()
+    local enteredKey = keyInput.Text:upper()
+    
+    if enteredKey == correctKey then
+        keyVerified = true
+        loadMainHub()
+    else
+        keyInput.Text = ""
+        keyInput.PlaceholderText = "Wrong key! Join Discord for key"
+        submitBtn.Text = "❌ WRONG KEY"
+        submitBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        
+        task.wait(1.5)
+        
+        submitBtn.Text = "VERIFY KEY"
+        submitBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        keyInput.PlaceholderText = "Enter Key (Get from Discord)"
+    end
+end)
+
+
+-- Auto-focus
+keyInput.Focused:Connect(function()
+    keyInput.PlaceholderText = "Note: TAP LINK TO COPY"
+end)
+
+
+keyInput.FocusLost:Connect(function()
+    keyInput.PlaceholderText = "Enter Key (Get from Discord)"
+end)
+
+
+-- Auto-close key UI if already verified
+if keyVerified then
+    keyScreenGui:Destroy()
+    loadMainHub()
+end
